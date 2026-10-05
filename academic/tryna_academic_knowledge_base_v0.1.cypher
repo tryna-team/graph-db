@@ -159,6 +159,23 @@ WITH collect(r) AS obsoleteNodes, count(r) AS removedCount
 FOREACH (obsoleteNode IN obsoleteNodes | DELETE obsoleteNode)
 RETURN removedCount AS removedObsoleteRecommendationCount;
 
+// 이전 Academic 초안의 범용·중복 추천 관계를 정리한다.
+MATCH (source)-[rel:RECOMMENDS {seedSource: 'academic_v0.1'}]->(r:RecommendationTemplate)
+WHERE (source:Context AND source.code = 'academic' AND r.code IN [
+    'prepare_study_materials', 'set_study_goal', 'review_previous_study'
+  ])
+  OR (source:EventType AND source.code = 'group_study' AND r.code = 'check_location')
+  OR (source:EventType AND source.code IN ['self_study', 'group_study']
+      AND r.code = 'pack_power_bank')
+  OR (source:EventType AND source.code IN ['self_study', 'class_session']
+      AND r.code = 'pack_stationery')
+  OR (source:EventType AND source.code = 'class_session'
+      AND r.code = 'charge_laptop'
+  )
+WITH collect(rel) AS obsoleteRelationships, count(rel) AS removedCount
+FOREACH (obsoleteRelationship IN obsoleteRelationships | DELETE obsoleteRelationship)
+RETURN removedCount AS removedTrimmedRelationshipCount;
+
 
 // ============================================================
 // 3. Context 1개
@@ -317,7 +334,7 @@ UNWIND [
     embeddingText: '신입생 첫 수업, 처음 듣는 전공 수업, 익숙하지 않은 강의동이나 강의실에서 듣는 수업. 추천 행동: 수업 시작 시간, 건물과 강의실 확인하기.',
     category: 'check', actionType: 'check', targetType: 'schedule_location',
     suggestionLevel: 'contextual', defaultTiming: '전날 또는 수업 전',
-    locale: 'ko', seedVersion: '0.1', seedSource: 'academic_v0.1', isActive: true
+    locale: 'ko', seedVersion: '0.1', seedSource: 'academic_v0.1', isActive: true, excludedPlaceTypes: ['online']
   },
   {
     code: 'check_course_notice', name: '수업 공지와 변경사항 확인하기',
@@ -447,57 +464,29 @@ RETURN [
 
 
 // ============================================================
-// 8. Context 기반 추천 3개
-// ============================================================
-
-UNWIND [
-  {sourceCode: 'academic', recommendationCode: 'prepare_study_materials', defaultRank: 5, suggestionMode: 'safe', reason: '학습에 사용할 교재와 자료 준비'},
-  {sourceCode: 'academic', recommendationCode: 'set_study_goal', defaultRank: 8, suggestionMode: 'contextual', reason: '학습 일정의 작은 목표 설정'},
-  {sourceCode: 'academic', recommendationCode: 'review_previous_study', defaultRank: 9, suggestionMode: 'contextual', reason: '이전 학습 진도에서 이어서 시작'}
-] AS row
-MATCH (c:Context {code: row.sourceCode})
-MATCH (r:RecommendationTemplate {code: row.recommendationCode})
-MERGE (c)-[rel:RECOMMENDS]->(r)
-SET rel.defaultRank = row.defaultRank,
-    rel.requiredContexts = [],
-    rel.suggestionMode = row.suggestionMode,
-    rel.reason = row.reason,
-    rel.seedVersion = '0.1',
-    rel.seedSource = 'academic_v0.1',
-    rel.isActive = true;
-
-
-// ============================================================
-// 9. 신규 EventType 기반 추천 29개
+// 8. 신규 EventType 기반 추천 22개
 // ============================================================
 
 UNWIND [
   {sourceCode: 'self_study', recommendationCode: 'set_study_goal', defaultRank: 1, requiredContexts: [], suggestionMode: 'safe', reason: '이번 공부 범위 설정'},
   {sourceCode: 'self_study', recommendationCode: 'prepare_study_materials', defaultRank: 2, requiredContexts: [], suggestionMode: 'safe', reason: '필요한 교재와 자료 준비'},
   {sourceCode: 'self_study', recommendationCode: 'review_previous_study', defaultRank: 3, requiredContexts: [], suggestionMode: 'contextual', reason: '마지막 학습 진도 확인'},
-  {sourceCode: 'self_study', recommendationCode: 'pack_stationery', defaultRank: 4, requiredContexts: [], suggestionMode: 'contextual', reason: '필기 도구 준비'},
-  {sourceCode: 'self_study', recommendationCode: 'pack_laptop', defaultRank: 5, requiredContexts: [], suggestionMode: 'contextual', reason: '디지털 자료 사용 가능'},
-  {sourceCode: 'self_study', recommendationCode: 'charge_laptop', defaultRank: 6, requiredContexts: [], suggestionMode: 'conditional', reason: '외부에서 노트북 사용 가능'},
-  {sourceCode: 'self_study', recommendationCode: 'pack_laptop_charger', defaultRank: 7, requiredContexts: [], suggestionMode: 'conditional', reason: '장시간 노트북 사용 가능'},
-  {sourceCode: 'self_study', recommendationCode: 'pack_power_bank', defaultRank: 8, requiredContexts: [], suggestionMode: 'conditional', reason: '외부 학습 중 기기 배터리 대비'},
+  {sourceCode: 'self_study', recommendationCode: 'pack_laptop', defaultRank: 4, requiredContexts: [], suggestionMode: 'contextual', reason: '디지털 자료 사용 가능'},
+  {sourceCode: 'self_study', recommendationCode: 'pack_laptop_charger', defaultRank: 5, requiredContexts: [], suggestionMode: 'conditional', reason: '장시간 노트북 사용 가능'},
 
   {sourceCode: 'group_study', recommendationCode: 'check_study_schedule', defaultRank: 1, requiredContexts: [], suggestionMode: 'safe', reason: '스터디 시간과 장소 확인'},
   {sourceCode: 'group_study', recommendationCode: 'prepare_study_materials', defaultRank: 2, requiredContexts: [], suggestionMode: 'safe', reason: '스터디에 필요한 자료 준비'},
   {sourceCode: 'group_study', recommendationCode: 'review_previous_study', defaultRank: 3, requiredContexts: [], suggestionMode: 'contextual', reason: '이전 스터디 진도 확인'},
-  {sourceCode: 'group_study', recommendationCode: 'check_location', defaultRank: 4, requiredContexts: [], suggestionMode: 'safe', reason: '정확한 만남 장소 확인'},
-  {sourceCode: 'group_study', recommendationCode: 'check_travel_time', defaultRank: 5, requiredContexts: [], suggestionMode: 'contextual', reason: '스터디 장소까지 이동시간 확인'},
-  {sourceCode: 'group_study', recommendationCode: 'pack_laptop', defaultRank: 6, requiredContexts: [], suggestionMode: 'contextual', reason: '공유 자료와 작업에 노트북 사용 가능'},
-  {sourceCode: 'group_study', recommendationCode: 'charge_laptop', defaultRank: 7, requiredContexts: [], suggestionMode: 'conditional', reason: '외부에서 노트북 사용 가능'},
-  {sourceCode: 'group_study', recommendationCode: 'pack_laptop_charger', defaultRank: 8, requiredContexts: [], suggestionMode: 'conditional', reason: '장시간 노트북 사용 가능'},
-  {sourceCode: 'group_study', recommendationCode: 'pack_power_bank', defaultRank: 9, requiredContexts: [], suggestionMode: 'conditional', reason: '외부 스터디 중 기기 배터리 대비'},
+  {sourceCode: 'group_study', recommendationCode: 'check_travel_time', defaultRank: 4, requiredContexts: [], suggestionMode: 'contextual', reason: '스터디 장소까지 이동시간 확인'},
+  {sourceCode: 'group_study', recommendationCode: 'pack_laptop', defaultRank: 5, requiredContexts: [], suggestionMode: 'contextual', reason: '공유 자료와 작업에 노트북 사용 가능'},
+  {sourceCode: 'group_study', recommendationCode: 'charge_laptop', defaultRank: 6, requiredContexts: [], suggestionMode: 'conditional', reason: '외부에서 노트북 사용 가능'},
+  {sourceCode: 'group_study', recommendationCode: 'pack_laptop_charger', defaultRank: 7, requiredContexts: [], suggestionMode: 'conditional', reason: '장시간 노트북 사용 가능'},
 
   {sourceCode: 'class_session', recommendationCode: 'check_course_notice', defaultRank: 1, requiredContexts: [], suggestionMode: 'safe', reason: '휴강과 변경사항 확인'},
   {sourceCode: 'class_session', recommendationCode: 'prepare_study_materials', defaultRank: 2, requiredContexts: [], suggestionMode: 'safe', reason: '수업 교재와 자료 준비'},
   {sourceCode: 'class_session', recommendationCode: 'check_class_schedule', defaultRank: 3, requiredContexts: [], suggestionMode: 'contextual', reason: '처음 듣거나 익숙하지 않은 수업의 건물과 강의실 확인'},
-  {sourceCode: 'class_session', recommendationCode: 'pack_stationery', defaultRank: 4, requiredContexts: [], suggestionMode: 'contextual', reason: '수업 필기 도구 준비'},
-  {sourceCode: 'class_session', recommendationCode: 'pack_laptop', defaultRank: 5, requiredContexts: [], suggestionMode: 'contextual', reason: '수업에서 노트북 사용 가능'},
-  {sourceCode: 'class_session', recommendationCode: 'charge_laptop', defaultRank: 6, requiredContexts: [], suggestionMode: 'conditional', reason: '수업 중 노트북 사용 가능'},
-  {sourceCode: 'class_session', recommendationCode: 'pack_laptop_charger', defaultRank: 7, requiredContexts: [], suggestionMode: 'conditional', reason: '장시간 수업 중 충전 필요 가능'},
+  {sourceCode: 'class_session', recommendationCode: 'pack_laptop', defaultRank: 4, requiredContexts: [], suggestionMode: 'contextual', reason: '수업에서 노트북 사용 가능'},
+  {sourceCode: 'class_session', recommendationCode: 'pack_laptop_charger', defaultRank: 5, requiredContexts: [], suggestionMode: 'conditional', reason: '장시간 수업 중 충전 필요 가능'},
 
   {sourceCode: 'exam', recommendationCode: 'check_exam_schedule', defaultRank: 1, requiredContexts: [], suggestionMode: 'safe', reason: '시험 시간과 시험실 확인'},
   {sourceCode: 'exam', recommendationCode: 'check_exam_scope', defaultRank: 2, requiredContexts: [], suggestionMode: 'safe', reason: '공지된 시험 범위 확인'},
@@ -518,7 +507,7 @@ SET rel.defaultRank = row.defaultRank,
 
 
 // ============================================================
-// 10. 기존 assignment EventType에 신규 추천 2개 연결
+// 9. 기존 assignment EventType에 신규 추천 2개 연결
 // 기존 4개 관계는 migration으로 범용화했으므로 중복 생성하지 않는다.
 // ============================================================
 
@@ -539,7 +528,7 @@ SET rel.defaultRank = row.defaultRank,
 
 
 // ============================================================
-// 11. 기존 PlaceType 기반 추천 2개
+// 10. 기존 PlaceType 기반 추천 2개
 // 장소 단독 입력으로 열리지 않도록 academic Context를 요구한다.
 // ============================================================
 
@@ -557,9 +546,9 @@ SET rel.defaultRank = 4,
 
 
 // ============================================================
-// 12. Academic seed smoke check
+// 11. Academic seed smoke check
 // 기대: Context 1, EventType 4, RecommendationTemplate 12
-//       신규 노드 17, RECOMMENDS 36, invalid* 0
+//       신규 노드 17, RECOMMENDS 26, invalid* 0
 // ============================================================
 
 MATCH (n {seedSource: 'academic_v0.1'})

@@ -12,21 +12,21 @@
 
 신규 노드는 17개다.
 
-| 라벨 | 개수 | 코드 |
-|---|---:|---|
-| `Context` | 1 | `academic` |
-| `EventType` | 4 | `self_study`, `group_study`, `class_session`, `exam` |
-| `PlaceType` | 0 | 기존 `school`, `library`, `cafe`, `online` 재사용 |
-| `RecommendationTemplate` | 12 | 학습 목표, 자료, 수업, 시험, 과제, 학습 공간 관련 추천 |
+| 라벨                     | 개수 | 코드                                                   |
+| ------------------------ | ---: | ------------------------------------------------------ |
+| `Context`                |    1 | `academic`                                             |
+| `EventType`              |    4 | `self_study`, `group_study`, `class_session`, `exam`   |
+| `PlaceType`              |    0 | 기존 `school`, `library`, `cafe`, `online` 재사용      |
+| `RecommendationTemplate` |   12 | 학습 목표, 자료, 수업, 시험, 과제, 학습 공간 관련 추천 |
 
-신규 `RECOMMENDS`는 36개다.
+신규 `RECOMMENDS`는 26개다.
 
-| 출발 노드 | 관계 수 |
-|---|---:|
-| `academic` Context | 3 |
-| 신규 EventType 4개 | 29 |
-| 기존 `assignment` EventType | 2 |
-| 기존 `library`, `cafe` PlaceType | 2 |
+| 출발 노드                        | 관계 수 |
+| -------------------------------- | ------: |
+| `academic` Context               |       0 |
+| 신규 EventType 4개               |      22 |
+| 기존 `assignment` EventType      |       2 |
+| 기존 `library`, `cafe` PlaceType |       2 |
 
 기존 `assignment`의 추천 관계 4개는 새로 만들지 않고 개인 과제에도 쓸 수 있도록 `requiredContexts = []`로 범용화한다. 따라서 Academic 관계 수에 이 4개를 다시 더하지 않는다.
 
@@ -38,13 +38,13 @@ EventType               12
 PlaceType               11
 RecommendationTemplate  62
 전체 노드               91
-RECOMMENDS              162
+RECOMMENDS              152
 IS_A                      2
 ```
 
 ## 실행 순서
 
-이 파일에는 독립 Cypher statement가 24개 들어 있다. Neo4j Query에서 **파일 전체를 한 번에 실행하지 말고**, 세미콜론(`;`)을 기준으로 위에서부터 한 statement씩 실행한다.
+이 파일에는 독립 Cypher statement가 25개 들어 있다. Neo4j Query에서 **파일 전체를 한 번에 실행하지 말고**, 세미콜론(`;`)을 기준으로 위에서부터 한 statement씩 실행한다.
 
 1. `teamProject v0.5 → travel v0.1 → hangout v0.1`이 적용된 같은 database를 선택한다.
 2. `tryna_academic_knowledge_base_v0.1.cypher`를 위에서부터 실행한다.
@@ -58,6 +58,7 @@ updatedEventTypeExclusionCount = 4
 resetSharedRecommendationCount = 1
 removedObsoleteRelationshipCount = 0 또는 5
 removedObsoleteRecommendationCount = 0 또는 1
+removedTrimmedRelationshipCount = 0~9
 ```
 
 `updatedContextExclusionCount`나 `updatedEventTypeExclusionCount`가 4보다 작거나 `resetSharedRecommendationCount`가 1이 아니면 선행 카테고리 중 일부가 같은 database에 없는 것이다. 삭제 count는 이 수정본을 처음 실행하면 `0 / 0`, 학생증·계산기·물 추천이 있던 직전 초안을 이미 실행했다면 최대 `5 / 1`이 정상이다.
@@ -78,7 +79,7 @@ missingSharedPlaceTypes = []
 Context                 1
 EventType               4
 RecommendationTemplate 12
-RECOMMENDS              36
+RECOMMENDS              26
 invalidRelationshipCount 0
 academicRecommendationCount 12
 invalidRecommendationCount 0
@@ -110,7 +111,7 @@ invalidRecommendationCount 0
 - `library → check_study_space_access`, `cafe → check_study_space_access` 관계는 `requiredContexts = ['academic']`이다.
 - 추천 벡터 검색도 현재 확정된 Context·EventType·PlaceType에서 실제로 이어지는 추천 노드만 허용한다.
 - 강의실·건물 확인은 첫 수업, 신입생, 익숙하지 않은 강의동 같은 단서가 있을 때만 선택하는 contextual 추천이다.
-- 충전기와 보조배터리는 후보에 들어갈 수 있지만 노트북 사용이나 장시간 외부 학습 단서가 없으면 최종 LLM이 선택하지 않는다.
+- 노트북과 충전기는 후보에 들어갈 수 있지만 노트북 사용이나 장시간 외부 학습 단서가 없으면 최종 LLM이 선택하지 않는다. 보조배터리는 Academic 추천 관계에서 제외한다.
 
 즉, 아래처럼 처리한다.
 
@@ -122,24 +123,24 @@ invalidRecommendationCount 0
 
 ## 최소 회귀 입력
 
-| 입력 | 기대 분류 | 최소 기대 추천 | 금지 |
-|---|---|---|---|
-| `민수` | 모두 null | 0개 | 모든 학업 추천 |
-| `학교` | school만 가능 | 0개 | 수업 자동 추론 |
-| `도서관` | library만 가능 | 0개 | 개인 공부 자동 추론 |
-| `스터디카페` | PlaceType만 가능 | 0개 | 그룹 스터디 자동 추론 |
-| `일본어 공부` | academic + self_study | 학습 범위, 교재 | 해외여행·여권 |
-| `카페 공부` | academic + self_study + cafe | 학습 준비, 공간 운영시간 | 약속·예약 추천 |
-| `민수 스터디` | academic + group_study | 시간·장소, 자료 | 식사·영화 추천 |
-| `시험 공부` | academic + self_study | 학습 범위, 자료 | 시험 당일 준비물 자동 확정 |
-| `중간고사` | academic + exam | 시험 시간, 범위, 준비물 | 여행·티켓 추천 |
-| `수업` | academic + class_session | 시간·강의실, 공지 | Hangout 추천 |
-| `온라인 강의` | academic + class_session + online | 수업 공지·자료 | 온라인 회의 추천 |
-| `과제` | academic + assignment | 마감, 요구사항 | team_project 강제 |
-| `팀플 제출` | team_project + assignment | 마감, 요구사항, 파일 | 같은 code 중복 행 |
-| `일본 여행` | travel | 여행 추천 | Academic 추천 |
-| `친구랑 카페` | hangout + cafe | 약속 추천 | 공부 공간 추천 |
-| `도서관 책 반납` | library만 가능 | 0개 | 개인 공부 추천 |
+| 입력             | 기대 분류                         | 최소 기대 추천           | 금지                       |
+| ---------------- | --------------------------------- | ------------------------ | -------------------------- |
+| `민수`           | 모두 null                         | 0개                      | 모든 학업 추천             |
+| `학교`           | school만 가능                     | 0개                      | 수업 자동 추론             |
+| `도서관`         | library만 가능                    | 0개                      | 개인 공부 자동 추론        |
+| `스터디카페`     | PlaceType만 가능                  | 0개                      | 그룹 스터디 자동 추론      |
+| `일본어 공부`    | academic + self_study             | 학습 범위, 교재          | 해외여행·여권              |
+| `카페 공부`      | academic + self_study + cafe      | 학습 준비, 공간 운영시간 | 약속·예약 추천             |
+| `민수 스터디`    | academic + group_study            | 시간·장소, 자료          | 식사·영화 추천             |
+| `시험 공부`      | academic + self_study             | 학습 범위, 자료          | 시험 당일 준비물 자동 확정 |
+| `중간고사`       | academic + exam                   | 시험 시간, 범위, 준비물  | 여행·티켓 추천             |
+| `수업`           | academic + class_session          | 시간·강의실, 공지        | Hangout 추천               |
+| `온라인 강의`    | academic + class_session + online | 수업 공지·자료           | 온라인 회의 추천           |
+| `과제`           | academic + assignment             | 마감, 요구사항           | team_project 강제          |
+| `팀플 제출`      | team_project + assignment         | 마감, 요구사항, 파일     | 같은 code 중복 행          |
+| `일본 여행`      | travel                            | 여행 추천                | Academic 추천              |
+| `친구랑 카페`    | hangout + cafe                    | 약속 추천                | 공부 공간 추천             |
+| `도서관 책 반납` | library만 가능                    | 0개                      | 개인 공부 추천             |
 
 ## Assignment migration 확인
 
