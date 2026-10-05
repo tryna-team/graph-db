@@ -341,17 +341,30 @@ RETURN count(rel) AS newlyGatedTravelPlaceRelationshipCount;
 
 
 // ============================================================
-// 8. Context 기반 추천 7개
+// 7.5. 이전 Hangout 초안의 잔여 추천 관계 정리 (Migration)
+// 초안이 실행된 DB에서 이번 경량화로 제외된 7개 관계를 삭제한다.
+// ============================================================
+
+MATCH (source)-[rel:RECOMMENDS {seedSource: 'hangout_v0.1'}]->(r:RecommendationTemplate)
+WHERE (source:Context AND source.code = 'hangout' AND r.code IN [
+    'check_travel_time', 'check_transport', 'charge_phone', 'pack_power_bank'
+  ])
+  OR (source:EventType AND source.code = 'social_meetup' AND r.code IN [
+    'check_travel_time', 'check_transport', 'charge_phone'
+  ])
+WITH collect(rel) AS obsoleteRelationships, count(rel) AS removedCount
+FOREACH (obsoleteRelationship IN obsoleteRelationships | DELETE obsoleteRelationship)
+RETURN removedCount AS removedHangoutRelationshipCount;
+
+
+// ============================================================
+// 8. Context 기반 추천 3개
 // ============================================================
 
 UNWIND [
   {sourceCode: 'hangout', recommendationCode: 'confirm_meetup_time', defaultRank: 1, suggestionMode: 'safe', reason: '상대방과 정한 약속 시간 확인'},
   {sourceCode: 'hangout', recommendationCode: 'check_location', defaultRank: 2, suggestionMode: 'safe', reason: '정확한 만남 장소 확인'},
-  {sourceCode: 'hangout', recommendationCode: 'review_meetup_details', defaultRank: 3, suggestionMode: 'safe', reason: '최근 대화에서 약속 변경 내용 확인'},
-  {sourceCode: 'hangout', recommendationCode: 'check_travel_time', defaultRank: 4, suggestionMode: 'contextual', reason: '만남 장소까지 이동시간 확인'},
-  {sourceCode: 'hangout', recommendationCode: 'check_transport', defaultRank: 5, suggestionMode: 'conditional', reason: '만남 장소까지 이동 경로 확인'},
-  {sourceCode: 'hangout', recommendationCode: 'charge_phone', defaultRank: 8, suggestionMode: 'contextual', reason: '연락과 길찾기에 사용할 휴대전화 충전'},
-  {sourceCode: 'hangout', recommendationCode: 'pack_power_bank', defaultRank: 9, suggestionMode: 'conditional', reason: '장시간 외출 중 배터리 부족 대비'}
+  {sourceCode: 'hangout', recommendationCode: 'review_meetup_details', defaultRank: 3, suggestionMode: 'safe', reason: '최근 대화에서 약속 변경 내용 확인'}
 ] AS row
 MATCH (c:Context {code: row.sourceCode})
 MATCH (r:RecommendationTemplate {code: row.recommendationCode})
@@ -366,17 +379,14 @@ SET rel.defaultRank = row.defaultRank,
 
 
 // ============================================================
-// 9. EventType 기반 추천 22개
+// 9. EventType 기반 추천 19개
 // ============================================================
 
 UNWIND [
   {sourceCode: 'social_meetup', recommendationCode: 'confirm_meetup_time', defaultRank: 1, requiredContexts: [], suggestionMode: 'safe', reason: '상대방과 정한 약속 시간 확인'},
   {sourceCode: 'social_meetup', recommendationCode: 'check_location', defaultRank: 2, requiredContexts: [], suggestionMode: 'safe', reason: '정확한 만남 장소 확인'},
   {sourceCode: 'social_meetup', recommendationCode: 'review_meetup_details', defaultRank: 3, requiredContexts: [], suggestionMode: 'safe', reason: '최근 대화에서 변경 내용 확인'},
-  {sourceCode: 'social_meetup', recommendationCode: 'check_travel_time', defaultRank: 4, requiredContexts: [], suggestionMode: 'contextual', reason: '만남 장소까지 이동시간 확인'},
-  {sourceCode: 'social_meetup', recommendationCode: 'check_transport', defaultRank: 5, requiredContexts: [], suggestionMode: 'conditional', reason: '만남 장소까지 이동 경로 확인'},
-  {sourceCode: 'social_meetup', recommendationCode: 'charge_phone', defaultRank: 7, requiredContexts: [], suggestionMode: 'contextual', reason: '연락과 길찾기에 사용할 휴대전화 충전'},
-  {sourceCode: 'social_meetup', recommendationCode: 'check_return_transport', defaultRank: 10, requiredContexts: [], suggestionMode: 'conditional', reason: '늦게 끝나는 약속의 귀가 경로 확인'},
+  {sourceCode: 'social_meetup', recommendationCode: 'check_return_transport', defaultRank: 4, requiredContexts: [], suggestionMode: 'conditional', reason: '늦게 끝나는 약속의 귀가 경로 확인'},
 
   {sourceCode: 'dining_meetup', recommendationCode: 'confirm_meetup_time', defaultRank: 1, requiredContexts: [], suggestionMode: 'safe', reason: '식사 약속 시간 확인'},
   {sourceCode: 'dining_meetup', recommendationCode: 'check_location', defaultRank: 2, requiredContexts: [], suggestionMode: 'safe', reason: '정확한 식당·카페 위치 확인'},
@@ -449,7 +459,7 @@ SET rel.defaultRank = row.defaultRank,
 // ============================================================
 // 11. Hangout seed smoke check
 // 기대: Context 1, EventType 3, PlaceType 3, RecommendationTemplate 11
-//       RECOMMENDS 45, invalid* 0
+//       RECOMMENDS 38, invalid* 0
 // ============================================================
 
 MATCH (n {seedSource: 'hangout_v0.1'})
