@@ -13,7 +13,7 @@
 - `EventType`: 3
 - `PlaceType`: 3
 - `RecommendationTemplate`: 11
-- `RECOMMENDS`: 45
+- `RECOMMENDS`: 38
 - 신규 노드 합계: 18
 
 기존 `cafe` PlaceType과 공용 추천 6개는 새로 만들거나 수정하지 않고 재사용한다.
@@ -27,14 +27,14 @@ pack_power_bank
 pack_water
 ```
 
-팀프로젝트 v0.5와 여행 v0.1이 적용된 DB에 추가하면 전체는 노드 74개, `RECOMMENDS` 126개가 된다.
+팀프로젝트 v0.5와 여행 v0.1이 적용된 DB에 추가하면 전체는 노드 74개, `RECOMMENDS` 119개가 된다.
 
 ## 실행 순서
 
 1. `tryna_hangout_knowledge_base_v0.1.cypher`를 위에서부터 statement 단위로 실행한다.
 2. 공용 노드 확인 결과가 `missingSharedCodes = []`인지 확인한다.
 3. 여행 Place gate migration 결과는 처음 실행하면 일반적으로 `18`, 수정된 여행 seed를 다시 실행했다면 `0`이어도 정상이다.
-4. 마지막 smoke check에서 `1 / 3 / 3 / 11`, `RECOMMENDS 45`, invalid 값 `0`을 확인한다.
+4. 마지막 smoke check에서 `1 / 3 / 3 / 11`, `RECOMMENDS 38`, invalid 값 `0`을 확인한다.
 5. 기존 embedding 적재 쿼리 A·B를 다시 실행한다. 기존 노드가 최신이면 Hangout 신규 18개만 embedding 대상이다.
 6. 기존 vector index는 라벨 전체를 대상으로 하므로 새로 만들 필요가 없다.
 7. 앱 조회에는 수정된 공통 쿼리 C·D를 사용한다. D는 현재 graph source와 연결된 추천 안에서만 벡터 순위를 계산하므로 다른 카테고리 후보가 섞이는 것을 줄인다.
