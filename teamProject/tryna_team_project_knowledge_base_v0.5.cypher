@@ -404,6 +404,23 @@ ON CREATE SET r.createdAt = datetime()
 SET r += row,
     r.updatedAt = datetime();
 
+// ============================================================
+// 4.5. 기존 TeamProject 중복 추천 관계 정리 (Migration)
+// 일정 자체의 시간 정보와 중복되는 확인 추천을 제거한다.
+// ============================================================
+
+MATCH (source:EventType)-[rel:RECOMMENDS]->(r:RecommendationTemplate)
+WHERE
+  (source.code = 'meeting' AND r.code = 'check_meeting_time')
+  OR
+  (source.code = 'assignment' AND r.code = 'check_deadline')
+WITH collect(rel) AS obsoleteRelationships, count(rel) AS removedCount
+FOREACH (
+  obsoleteRelationship IN obsoleteRelationships |
+  DELETE obsoleteRelationship
+)
+RETURN removedCount AS removedTeamProjectRelationshipCount;
+
 
 // ============================================================
 // 5. Context 기반 일반 추천
@@ -443,48 +460,38 @@ SET rel.defaultRank = row.defaultRank,
 
 UNWIND [
   {
-    sourceCode: 'meeting', recommendationCode: 'check_meeting_time',
-    defaultRank: 1, requiredContexts: [], suggestionMode: 'safe',
-    reason: '회의의 날짜와 시작 시간 확인'
-  },
-  {
     sourceCode: 'meeting', recommendationCode: 'note_discussion_points',
-    defaultRank: 2, requiredContexts: [], suggestionMode: 'safe',
+    defaultRank: 1, requiredContexts: [], suggestionMode: 'safe',
     reason: '회의 전에 질문과 논의 내용을 준비'
   },
   {
     sourceCode: 'meeting', recommendationCode: 'check_latest_work',
-    defaultRank: 3, requiredContexts: ['team_project'], suggestionMode: 'safe',
+    defaultRank: 2, requiredContexts: ['team_project'], suggestionMode: 'safe',
     reason: '회의 전에 최근 작업 상태 확인'
   },
   {
     sourceCode: 'meeting', recommendationCode: 'check_needed_files',
-    defaultRank: 4, requiredContexts: [], suggestionMode: 'safe',
+    defaultRank: 3, requiredContexts: [], suggestionMode: 'safe',
     reason: '회의에서 사용할 파일과 링크 확인'
   },
   {
     sourceCode: 'meeting', recommendationCode: 'pack_laptop',
-    defaultRank: 5, requiredContexts: ['team_project'], suggestionMode: 'contextual',
+    defaultRank: 4, requiredContexts: ['team_project'], suggestionMode: 'contextual',
     reason: '팀 프로젝트 회의에서 노트북을 사용할 가능성이 있음'
   },
   {
-    sourceCode: 'assignment', recommendationCode: 'check_deadline',
-    defaultRank: 1, requiredContexts: [], suggestionMode: 'safe',
-    reason: '제출 일정의 정확한 마감시간 확인'
-  },
-  {
     sourceCode: 'assignment', recommendationCode: 'check_submission_location',
-    defaultRank: 2, requiredContexts: [], suggestionMode: 'safe',
+    defaultRank: 1, requiredContexts: [], suggestionMode: 'safe',
     reason: '실제 제출 위치 확인'
   },
   {
     sourceCode: 'assignment', recommendationCode: 'open_final_file',
-    defaultRank: 3, requiredContexts: [], suggestionMode: 'safe',
+    defaultRank: 2, requiredContexts: [], suggestionMode: 'safe',
     reason: '제출할 최종 파일 검증'
   },
   {
     sourceCode: 'assignment', recommendationCode: 'save_final_backup',
-    defaultRank: 4, requiredContexts: [], suggestionMode: 'safe',
+    defaultRank: 3, requiredContexts: [], suggestionMode: 'safe',
     reason: '중요한 최종 파일의 사본 보관'
   }
 ] AS row
