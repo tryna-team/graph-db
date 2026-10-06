@@ -25,7 +25,7 @@ Seed smoke check의 기대값은 다음과 같다.
 - `EventType`: 2
 - `PlaceType`: 4
 - `RecommendationTemplate`: 18
-- `RECOMMENDS`: 23
+- `RECOMMENDS`: 21
 - 잘못된 추천/관계 속성 개수: 0
 
 ## 온라인 조회
