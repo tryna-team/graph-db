@@ -356,9 +356,25 @@ RETURN [
 // "경조사"만으로는 구체 준비를 단정하지 않는다.
 // ============================================================
 
+// ============================================================
+// 7.5. 기존 SocialOccasion 중복 추천 관계 정리 (Migration)
+// 초안이 실행된 DB에서 초대 안내 확인과 중복되는 장소 확인 관계를 삭제한다.
+// ============================================================
+
+MATCH (source:EventType)-[rel:RECOMMENDS {seedSource: 'social_occasion_v0.1'}]->(r:RecommendationTemplate)
+WHERE
+  (source.code = 'wedding' AND r.code = 'check_location')
+  OR
+  (source.code = 'first_birthday' AND r.code = 'check_location')
+WITH collect(rel) AS obsoleteRelationships, count(rel) AS removedCount
+FOREACH (
+  obsoleteRelationship IN obsoleteRelationships |
+  DELETE obsoleteRelationship
+)
+RETURN removedCount AS removedSocialOccasionRelationshipCount;
 
 // ============================================================
-// 8. EventType 기반 추천 25개
+// 8. EventType 기반 추천 23개
 // ============================================================
 
 UNWIND [
@@ -369,18 +385,16 @@ UNWIND [
   {sourceCode: 'birthday', recommendationCode: 'prepare_birthday_greeting', defaultRank: 5, requiredContexts: [], suggestionMode: 'safe', reason: '생일 당일 축하 메시지나 연락 준비'},
 
   {sourceCode: 'wedding', recommendationCode: 'review_occasion_notice', defaultRank: 1, requiredContexts: [], suggestionMode: 'safe', reason: '청첩장에서 날짜·시간·장소 확인'},
-  {sourceCode: 'wedding', recommendationCode: 'check_location', defaultRank: 2, requiredContexts: [], suggestionMode: 'safe', reason: '정확한 예식 장소 확인'},
-  {sourceCode: 'wedding', recommendationCode: 'check_travel_time', defaultRank: 3, requiredContexts: [], suggestionMode: 'contextual', reason: '예식 장소까지 이동시간 확인'},
-  {sourceCode: 'wedding', recommendationCode: 'check_transport', defaultRank: 4, requiredContexts: [], suggestionMode: 'conditional', reason: '예식 장소까지 이동 경로 확인'},
-  {sourceCode: 'wedding', recommendationCode: 'prepare_congratulatory_money', defaultRank: 5, requiredContexts: [], suggestionMode: 'contextual', reason: '축하금과 봉투 준비 여부 확인'},
-  {sourceCode: 'wedding', recommendationCode: 'check_ceremony_attire', defaultRank: 6, requiredContexts: [], suggestionMode: 'conditional', reason: '별도 행사 복장 안내 확인'},
+  {sourceCode: 'wedding', recommendationCode: 'check_travel_time', defaultRank: 2, requiredContexts: [], suggestionMode: 'contextual', reason: '예식 장소까지 이동시간 확인'},
+  {sourceCode: 'wedding', recommendationCode: 'check_transport', defaultRank: 3, requiredContexts: [], suggestionMode: 'conditional', reason: '예식 장소까지 이동 경로 확인'},
+  {sourceCode: 'wedding', recommendationCode: 'prepare_congratulatory_money', defaultRank: 4, requiredContexts: [], suggestionMode: 'contextual', reason: '축하금과 봉투 준비 여부 확인'},
+  {sourceCode: 'wedding', recommendationCode: 'check_ceremony_attire', defaultRank: 5, requiredContexts: [], suggestionMode: 'conditional', reason: '별도 행사 복장 안내 확인'},
 
   {sourceCode: 'first_birthday', recommendationCode: 'review_occasion_notice', defaultRank: 1, requiredContexts: [], suggestionMode: 'safe', reason: '초대 안내에서 날짜·시간·장소 확인'},
-  {sourceCode: 'first_birthday', recommendationCode: 'check_location', defaultRank: 2, requiredContexts: [], suggestionMode: 'safe', reason: '정확한 돌잔치 장소 확인'},
-  {sourceCode: 'first_birthday', recommendationCode: 'check_travel_time', defaultRank: 3, requiredContexts: [], suggestionMode: 'contextual', reason: '돌잔치 장소까지 이동시간 확인'},
-  {sourceCode: 'first_birthday', recommendationCode: 'check_transport', defaultRank: 4, requiredContexts: [], suggestionMode: 'conditional', reason: '돌잔치 장소까지 이동 경로 확인'},
-  {sourceCode: 'first_birthday', recommendationCode: 'prepare_celebration_gift', defaultRank: 5, requiredContexts: [], suggestionMode: 'contextual', reason: '돌 선물 준비 여부 확인'},
-  {sourceCode: 'first_birthday', recommendationCode: 'prepare_congratulatory_money', defaultRank: 6, requiredContexts: [], suggestionMode: 'contextual', reason: '축하금과 봉투 준비 여부 확인'},
+  {sourceCode: 'first_birthday', recommendationCode: 'check_travel_time', defaultRank: 2, requiredContexts: [], suggestionMode: 'contextual', reason: '돌잔치 장소까지 이동시간 확인'},
+  {sourceCode: 'first_birthday', recommendationCode: 'check_transport', defaultRank: 3, requiredContexts: [], suggestionMode: 'conditional', reason: '돌잔치 장소까지 이동 경로 확인'},
+  {sourceCode: 'first_birthday', recommendationCode: 'prepare_celebration_gift', defaultRank: 4, requiredContexts: [], suggestionMode: 'contextual', reason: '돌 선물 준비 여부 확인'},
+  {sourceCode: 'first_birthday', recommendationCode: 'prepare_congratulatory_money', defaultRank: 5, requiredContexts: [], suggestionMode: 'contextual', reason: '축하금과 봉투 준비 여부 확인'},
 
   {sourceCode: 'funeral', recommendationCode: 'review_occasion_notice', defaultRank: 1, requiredContexts: [], suggestionMode: 'safe', reason: '부고에서 날짜·장소와 발인 정보 확인'},
   {sourceCode: 'funeral', recommendationCode: 'check_funeral_room', defaultRank: 2, requiredContexts: [], suggestionMode: 'safe', reason: '장례식장과 빈소 호실 확인'},
@@ -406,7 +420,7 @@ SET rel.defaultRank = row.defaultRank,
 // ============================================================
 // 9. 경조사 seed smoke check
 // 기대: Context 1, EventType 4, RecommendationTemplate 12
-//       신규 노드 17, RECOMMENDS 25, invalid* 0
+//       신규 노드 17, RECOMMENDS 23, invalid* 0
 // ============================================================
 
 MATCH (n {seedSource: 'social_occasion_v0.1'})

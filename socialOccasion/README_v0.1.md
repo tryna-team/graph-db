@@ -19,12 +19,12 @@
 | `PlaceType` | 0 | 장소 유형만으로 경조사를 추론하지 않음 |
 | `RecommendationTemplate` | 12 | 경조사 안내·선물·케이크·축하금·조의금·복장·빈소 관련 추천 |
 
-신규 `RECOMMENDS`는 25개다.
+신규 `RECOMMENDS`는 23개다.
 
 ```text
 birthday          5
-wedding           6
-first_birthday    6
+wedding           5
+first_birthday    5
 funeral           8
 Context 관계      0
 ```
@@ -38,9 +38,9 @@ PlaceType                11
 RecommendationTemplate   82
 전체 노드                121
 
-RECOMMENDS               214
+RECOMMENDS               212
 IS_A                       2
-전체 관계                216
+전체 관계                214
 ```
 
 ## 지원 범위
@@ -110,7 +110,7 @@ missingSharedCodes = []
 Context                         1
 EventType                       4
 RecommendationTemplate        12
-RECOMMENDS                     25
+RECOMMENDS                     23
 invalidRelationshipCount        0
 socialOccasionRecommendationCount 12
 invalidRecommendationCount      0
