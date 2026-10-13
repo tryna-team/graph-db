@@ -77,29 +77,49 @@ jobs:
                   echo "6. Running Work/Career (v0.1)..."
                   cypher-shell -a $DB_URI -u $DB_USER -p$DB_PASS -f workCareer/tryna_work_career_knowledge_base_v0.1.cypher
 
-            # 5. 스모크 테스트 수치 자동 검증 (104개 노드, 189개 RECOMMENDS 관계)
-            - name: Validate Database Integrity (Smoke Check)
+            # 5. 스모크 테스트 (데이터 무결성 결함 및 고도화 검증)
+            - name: Validate Database Integrity (Defect Check)
               run: |
-                  echo "Fetching totals from Neo4j..."
+                  echo "Checking for invalid nodes, relationships, orphans, and enum errors..."
 
-                  # 텍스트 포맷 없이 결과 숫자만 깔끔하게 가져오기 위해 --format plain 및 tail 사용
-                  NODE_COUNT=$(cypher-shell -a neo4j://localhost:7687 -u neo4j -p testpassword --format plain "MATCH (n) WHERE n:Context OR n:EventType OR n:PlaceType OR n:RecommendationTemplate RETURN count(n);" | tail -n 1 | tr -d ' ')
-                  RECOMMENDS_COUNT=$(cypher-shell -a neo4j://localhost:7687 -u neo4j -p testpassword --format plain "MATCH ()-[r:RECOMMENDS]->() RETURN count(r);" | tail -n 1 | tr -d ' ')
+                  # 1. 필수 속성이 누락된 불량 추천 템플릿(RecommendationTemplate) 개수 확인
+                  INVALID_NODES=$(cypher-shell -a neo4j://localhost:7687 -u neo4j -p testpassword --format plain "MATCH (r:RecommendationTemplate) WHERE r.embeddingText IS NULL OR r.conditionalText IS NULL OR r.suggestionLevel IS NULL RETURN count(r);" | tail -n 1 | tr -d ' ')
+
+                  # 2. 필수 속성이 누락된 불량 추천 관계(RECOMMENDS) 개수 확인
+                  INVALID_RELS=$(cypher-shell -a neo4j://localhost:7687 -u neo4j -p testpassword --format plain "MATCH ()-[rel:RECOMMENDS]->() WHERE rel.defaultRank IS NULL OR rel.suggestionMode IS NULL RETURN count(rel);" | tail -n 1 | tr -d ' ')
+
+                  # 3. 아무와도 연결되지 않은 고아 노드(Orphan Node) 확인
+                  ORPHAN_NODES=$(cypher-shell -a neo4j://localhost:7687 -u neo4j -p testpassword --format plain "MATCH (r:RecommendationTemplate) WHERE NOT ()-[:RECOMMENDS]->(r) RETURN count(r);" | tail -n 1 | tr -d ' ')
+
+                  # 4. Enum 오타 검증 (suggestionLevel)
+                  ENUM_ERRORS=$(cypher-shell -a neo4j://localhost:7687 -u neo4j -p testpassword --format plain "MATCH (r:RecommendationTemplate) WHERE NOT r.suggestionLevel IN ['safe', 'contextual', 'conditional'] RETURN count(r);" | tail -n 1 | tr -d ' ')
 
                   echo "----------------------------------------"
-                  echo "📊 Current Nodes Count: $NODE_COUNT (Expected: 104)"
-                  echo "🔗 Current RECOMMENDS Count: $RECOMMENDS_COUNT (Expected: 189)"
+                  echo "🚨 Invalid Nodes Found: $INVALID_NODES"
+                  echo "🚨 Invalid Relationships Found: $INVALID_RELS"
+                  echo "👻 Orphan Nodes Found: $ORPHAN_NODES"
+                  echo "🔠 Enum Errors Found: $ENUM_ERRORS"
                   echo "----------------------------------------"
 
-                  # 검증 로직: 숫자가 일치하지 않으면 exit 1로 CI 강제 실패 처리
-                  if [ "$NODE_COUNT" -ne 104 ]; then
-                    echo "❌ ERROR: Node count mismatch!"
+                  # 검증 로직: 불량 데이터가 1개라도 발견되면 CI 강제 실패 처리
+                  if [ "$INVALID_NODES" -ne 0 ]; then
+                    echo "❌ ERROR: Found RecommendationTemplates with missing required properties!"
                     exit 1
                   fi
 
-                  if [ "$RECOMMENDS_COUNT" -ne 189 ]; then
-                    echo "❌ ERROR: RECOMMENDS relationship count mismatch!"
+                  if [ "$INVALID_RELS" -ne 0 ]; then
+                    echo "❌ ERROR: Found RECOMMENDS relationships with missing required properties!"
                     exit 1
                   fi
 
-                  echo "✅ SUCCESS: All database integrity checks passed!"
+                  if [ "$ORPHAN_NODES" -ne 0 ]; then
+                    echo "❌ ERROR: Found disconnected (orphan) RecommendationTemplates!"
+                    exit 1
+                  fi
+
+                  if [ "$ENUM_ERRORS" -ne 0 ]; then
+                    echo "❌ ERROR: Found invalid values in suggestionLevel!"
+                    exit 1
+                  fi
+
+                  echo "✅ SUCCESS: All database integrity checks passed! No defects found."
