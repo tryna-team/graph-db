@@ -101,5 +101,3 @@ MERGE (rule5)-[:TARGETS]->(item5);
 MATCH (n)
 RETURN labels(n)[0] AS Label, count(n) AS Count
 ORDER BY Label;
-
-// trigger ci test
