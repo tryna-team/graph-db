@@ -5,7 +5,7 @@ on:
         branches:
             - develop # develop 브랜치에 코드가 push(또는 PR merge) 될 때만 실행됩니다.
         paths:
-            - "neo4j/v2.0_ontology/**/*.cypher" # 이 폴더 안의 모든 .cypher 파일 변경 감지
+            - "v2.0_ontology/**/*.cypher" # 이 폴더 안의 모든 .cypher 파일 변경 감지
         workflow_dispatch: # 깃허브 화면에 [수동 실행 버튼]을 생성
 
 jobs:
@@ -36,7 +36,7 @@ jobs:
               run: |
                   echo "Cypher 쿼리를 AuraDB에 배포합니다..."
                   # v2.0_ontology 폴더 안의 모든 .cypher 파일을 찾아서 하나씩 실행합니다.
-                  for file in ./neo4j/v2.0_ontology/*.cypher; do
+                  for file in ./v2.0_ontology/*.cypher; do
                       echo "실행 중: $file"
                       cat "$file" | cypher-shell \
                       -a "$NEO4J_URI" \
